@@ -1,5 +1,5 @@
 geohashtree is a class library for python.
-geohashtree can be used like dictionary, however, the key must be geohash.
+geohashtree can be used like dictionary, however, the keys must be geohash.
 k-NN search function is the feature of this data structure.
 
 geohashtree4gae can be used for storing geohash-indexed data into google app engine DB.
