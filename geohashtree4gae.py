@@ -152,13 +152,15 @@ class ValueDB(db.Model):
 
     # get values below the given path
     @classmethod
-    def getValues(cls, path_bits):
+    def getValues(cls, path_bits, max_depth=60):
         value = {}
         bits = [b for b in path_bits]
         if len(bits) > 0:
             min_hash = ght.bit2geohash(bits)
-            max_hash = ght.bit2geohash(ght._int2bit(ght._bit2int(bits) + 1, len(bits)))
-            q = ValueDB.gql('WHERE hashcode >= :min_hash AND hashcode < :max_hash', min_hash=min_hash, max_hash=max_hash)
+            #max_hash = ght.bit2geohash(ght._int2bit(ght._bit2int(bits) + 1, len(bits) + (1 if all(bits) else 0)))
+            #max_hash = min_hash[:-1] + chr(ord(min_hash[-1])+1)
+            max_hash = ght.bit2geohash(bits + [1]*(max_depth-len(bits)))
+            q = ValueDB.gql('WHERE hashcode >= :min_hash AND hashcode <= :max_hash', min_hash=min_hash, max_hash=max_hash)
         else:
             q = ValueDB.all()
         for value_db in q:
@@ -177,12 +179,12 @@ class StoredNode(ght.Node):
         self._is_value_loaded = False if value == None else True
 
 
-    def _getValues(self):
+    def _getValues(self, see_memcache=True):
         if self._is_value_loaded == True:
             return self._value
         else:
             self._is_value_loaded = True
-            self._value = memcache.get('_' + self.getPathStr(), namespace=self.getRoot().value_namespace)
+            self._value = memcache.get('_' + self.getPathStr(), namespace=self.getRoot().value_namespace) if see_memcache else None
             if self._value != None:
                 return self._value
             self._value = (self.getRoot().value_db_cls).getValues(self.getPath())
@@ -226,8 +228,8 @@ class StoredNode(ght.Node):
 class StoredRootNode(StoredNode):
 
     @classmethod
-    def loadRoot(cls, root_node_db_key_name='StoredNode_root', root_node_key='root', node_namespace='StoredNode', value_namespace='StoredValue', value_db_cls=ValueDB):
-        bitstr = memcache.get(root_node_key, namespace=node_namespace)
+    def loadRoot(cls, root_node_db_key_name='StoredNode_root', root_node_key='root', node_namespace='StoredNode', value_namespace='StoredValue', value_db_cls=ValueDB, see_memcache=True):
+        bitstr = memcache.get(root_node_key, namespace=node_namespace) if see_memcache else None
         if bitstr != None:
             _root = StoredNode.decodeSuccinct(bitstr)
             bunch_db = None
@@ -276,12 +278,13 @@ class StoredGeoPileTree(ght.GeoPileTree):
         self.is_tree_committing = False # whether tree should be commited (whether the structure is changed)
 
     @classmethod
-    def load(cls, tree_db_key_name='SGPT_Primary', memcache_key='Primary', tree_namespace='SGPT', value_namespace='StoredValue'):
+    def load(cls, tree_db_key_name='SGPT_Primary', memcache_key='Primary', tree_namespace='SGPT', value_namespace='StoredValue', see_memcache=True):
         root = StoredRootNode.loadRoot(
             root_node_db_key_name = tree_db_key_name,
             root_node_key = memcache_key,
             node_namespace = tree_namespace,
-            value_namespace = value_namespace
+            value_namespace = value_namespace,
+            see_memcache = see_memcache
         )
         return StoredGeoPileTree(NodeCls=StoredNode, root=root)
 

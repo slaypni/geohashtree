@@ -93,6 +93,7 @@ class Node(object):
             r += ')' * c
             node = next
         print r
+        return r
 
 
     def getSibling(self):
@@ -153,7 +154,7 @@ class BinaryTree(object):
 
 
     def printS(self):
-        self.root.printS()
+        return self.root.printS()
 
 
     def __iter__(self, node=None):
